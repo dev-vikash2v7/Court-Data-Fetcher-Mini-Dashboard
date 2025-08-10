@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Court Data Fetcher - Delhi High Court</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-content">
+                <h1><i class="fas fa-balance-scale"></i> Court Data Fetcher</h1>
+                <p>Delhi High Court Case Information System</p>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="search-section">
+                <div class="search-card">
+                    <h2><i class="fas fa-search"></i> Search Case Information</h2>
+                    <form id="caseSearchForm" class="search-form">
+                        <div class="form-group">
+                            <label for="caseType">Case Type</label>
+                            <select id="caseType" name="caseType" required>
+                                <option value="">Select Case Type</option>
+                                <option value="WP">Writ Petition (WP)</option>
+                                <option value="CRL">Criminal Appeal (CRL)</option>
+                                <option value="CIVIL">Civil Appeal (CIVIL)</option>
+                                <option value="LPA">Letters Patent Appeal (LPA)</option>
+                                <option value="ARB">Arbitration (ARB)</option>
+                                <option value="COMP">Company Petition (COMP)</option>
+                                <option value="TAX">Tax Matters (TAX)</option>
+                                <option value="MAT">Matrimonial (MAT)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="caseNumber">Case Number</label>
+                            <input type="text" id="caseNumber" name="caseNumber" placeholder="Enter case number" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="filingYear">Filing Year</label>
+                            <select id="filingYear" name="filingYear" required>
+                                <option value="">Select Year</option>
+                                <option value="2024">2024</option>
+                                <option value="2023">2023</option>
+                                <option value="2022">2022</option>
+                                <option value="2021">2021</option>
+                                <option value="2020">2020</option>
+                                <option value="2019">2019</option>
+                                <option value="2018">2018</option>
+                                <option value="2017">2017</option>
+                                <option value="2016">2016</option>
+                                <option value="2015">2015</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="search-btn">
+                            <i class="fas fa-search"></i> Search Case
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <div class="results-section" id="resultsSection" style="display: none;">
+                <div class="results-card">
+                    <div class="results-header">
+                        <h2><i class="fas fa-file-alt"></i> Case Details</h2>
+                        <button class="close-btn" onclick="hideResults()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    
+                    <div id="caseDetails" class="case-details">
+                        <!-- Case details will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <div class="history-section">
+                <div class="history-card">
+                    <h3><i class="fas fa-history"></i> Recent Searches</h3>
+                    <div id="searchHistory" class="history-list">
+                        <!-- Search history will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+            <div class="loading-content">
+                <div class="spinner"></div>
+                <p>Searching court records...</p>
+            </div>
+        </div>
+
+        <div id="errorModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+                    <button class="close-btn" onclick="closeErrorModal()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p id="errorMessage"></p>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-primary" onclick="closeErrorModal()">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
