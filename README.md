@@ -97,3 +97,6 @@ CREATE TABLE queries (
     parsed_data TEXT
 );
 ```
+## Build and start the Docker services
+
+```docker-compose up --build```

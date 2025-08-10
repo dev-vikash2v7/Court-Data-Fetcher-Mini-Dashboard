@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  court-room-app:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./downloads:/app/downloads
+      - ./court_data.db:/app/court_data.db
+      - /dev/shm:/dev/shm  # Shared memory for browser
+    environment:
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    # For Selenium web scraping, we need to run in privileged mode
+    privileged: true
