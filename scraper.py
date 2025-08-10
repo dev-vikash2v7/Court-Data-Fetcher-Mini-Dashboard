@@ -1,15 +1,13 @@
-"""
-Delhi High Court Web Scraper Module
-Handles automated data extraction from the Delhi High Court website
-"""
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.keys import Keys
 from selenium.common.exceptions import TimeoutException, NoSuchElementException, WebDriverException
+from webdriver_manager.chrome import ChromeDriverManager
 import time
 import random
 import logging
@@ -25,46 +23,52 @@ class DelhiHighCourtScraper:
     Scraper class for Delhi High Court website
     """
     
-    def __init__(self, headless=True):
+    def __init__(self, headless=False):
         self.headless = headless
         self.driver = None
         self.wait = None
         
     def setup_driver(self):
         """Setup Chrome WebDriver with anti-detection measures"""
-        chrome_options = Options()
-        
-        if self.headless:
-            chrome_options.add_argument('--headless')
-        
-        # Anti-detection measures
-        chrome_options.add_argument('--no-sandbox')
-        chrome_options.add_argument('--disable-dev-shm-usage')
-        chrome_options.add_argument('--disable-gpu')
-        chrome_options.add_argument('--window-size=1920,1080')
-        chrome_options.add_argument('--disable-blink-features=AutomationControlled')
-        chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-        chrome_options.add_experimental_option('useAutomationExtension', False)
-        
-        # Custom user agent
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        ]
-        chrome_options.add_argument(f'--user-agent={random.choice(user_agents)}')
-        
         try:
-            self.driver = webdriver.Chrome(options=chrome_options)
+            chrome_options = Options()
+            
+            if self.headless:
+                chrome_options.add_argument('--headless')
+            else:
+                # Make browser window visible and positioned
+                chrome_options.add_argument('--start-maximized')
+                chrome_options.add_argument('--disable-infobars')
+                chrome_options.add_argument('--disable-extensions')
+            
+            chrome_options.add_argument('--no-sandbox')
+            chrome_options.add_argument('--disable-dev-shm-usage')
+            chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--window-size=1920,1080')
+            chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+            chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
+            chrome_options.add_experimental_option('useAutomationExtension', False)
+            
+            # Use webdriver-manager to automatically download and manage Chrome driver
+            service = Service(ChromeDriverManager().install())
+            
+            self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             self.wait = WebDriverWait(self.driver, 10)
+            
+            # Add a delay so you can see the browser window
+            if not self.headless:
+                time.sleep(3)
+                logger.info("Browser window opened - you can now see the scraping process")
+            
             logger.info("Chrome WebDriver setup successful")
         except Exception as e:
             logger.error(f"Failed to setup Chrome WebDriver: {e}")
             raise
     
-    def random_delay(self, min_seconds=1, max_seconds=3):
-        """Add random delay to avoid detection"""
+    def random_delay(self, min_seconds=2, max_seconds=5):
+        """Add random delay to avoid detection and allow viewing"""
         delay = random.uniform(min_seconds, max_seconds)
         time.sleep(delay)
     
@@ -72,118 +76,76 @@ class DelhiHighCourtScraper:
         """Navigate to Delhi High Court website"""
         try:
             logger.info("Navigating to Delhi High Court website...")
-            self.driver.get("https://delhihighcourt.nic.in/")
-            self.random_delay(2, 4)
+            # Navigate directly to the case status page
+            self.driver.get("https://delhihighcourt.nic.in/app/get-case-type-status")
+            self.random_delay(3, 5)
             
-            # Wait for page to load
-            self.wait.until(EC.presence_of_element_located((By.TAG_NAME, "body")))
-            logger.info("Successfully loaded Delhi High Court website")
+            # Wait for page to load and form to be present
+            self.wait.until(EC.presence_of_element_located((By.ID, "case_type")))
+            logger.info("Successfully loaded Delhi High Court case status page")
             
         except Exception as e:
             logger.error(f"Failed to navigate to court website: {e}")
             raise
     
-    def find_case_status_link(self):
-        """Find and click on case status or cause list link"""
+    def get_captcha_code(self):
+        """Get the captcha code from the page"""
         try:
-            # Common selectors for case status links
-            possible_selectors = [
-                "//a[contains(text(), 'Case Status')]",
-                "//a[contains(text(), 'Cause List')]",
-                "//a[contains(text(), 'Case Information')]",
-                "//a[contains(text(), 'Search Cases')]",
-                "//a[contains(@href, 'case')]",
-                "//a[contains(@href, 'status')]"
-            ]
-            
-            for selector in possible_selectors:
-                try:
-                    link = self.wait.until(EC.element_to_be_clickable((By.XPATH, selector)))
-                    logger.info(f"Found case status link: {link.text}")
-                    link.click()
-                    self.random_delay(2, 4)
-                    return True
-                except TimeoutException:
-                    continue
-            
-            logger.warning("Could not find case status link, trying alternative approach")
-            return False
-            
+            # Wait for captcha to load
+            captcha_element = self.wait.until(EC.presence_of_element_located((By.ID, "captcha-code")))
+            captcha_code = captcha_element.text.strip()
+
+            print('** Get Captcha Code ** ' , captcha_code)
+            logger.info(f"Captcha code found: {captcha_code}")
+            return captcha_code
         except Exception as e:
-            logger.error(f"Error finding case status link: {e}")
-            return False
+            logger.error(f"Error getting captcha code: {e}")
+            return None
     
     def fill_case_search_form(self, case_type, case_number, filing_year):
         """Fill the case search form with provided details"""
         try:
             logger.info(f"Filling search form: {case_type}/{case_number}/{filing_year}")
             
-            # Common field selectors
-            field_selectors = {
-                'case_type': [
-                    "//select[@name='caseType']",
-                    "//select[@id='caseType']",
-                    "//input[@name='caseType']",
-                    "//input[@id='caseType']"
-                ],
-                'case_number': [
-                    "//input[@name='caseNumber']",
-                    "//input[@id='caseNumber']",
-                    "//input[@name='caseNo']",
-                    "//input[@id='caseNo']"
-                ],
-                'filing_year': [
-                    "//select[@name='filingYear']",
-                    "//select[@id='filingYear']",
-                    "//input[@name='filingYear']",
-                    "//input[@id='filingYear']"
-                ]
-            }
-            
-            # Fill case type
-            for selector in field_selectors['case_type']:
-                try:
-                    element = self.driver.find_element(By.XPATH, selector)
-                    if element.tag_name == 'select':
-                        from selenium.webdriver.support.ui import Select
-                        select = Select(element)
-                        select.select_by_value(case_type)
-                    else:
-                        element.clear()
-                        element.send_keys(case_type)
-                    logger.info("Filled case type field")
-                    break
-                except NoSuchElementException:
-                    continue
+            # Fill case type dropdown
+            case_type_select = self.driver.find_element(By.ID, "case_type")
+            from selenium.webdriver.support.ui import Select
+            select_case_type = Select(case_type_select)
+            select_case_type.select_by_value(case_type)
+            logger.info(f"Selected case type: {case_type}")
+            self.random_delay(1, 2)
+
+            print('** Filled case type ** ' , case_type)
+
             
             # Fill case number
-            for selector in field_selectors['case_number']:
-                try:
-                    element = self.driver.find_element(By.XPATH, selector)
-                    element.clear()
-                    element.send_keys(case_number)
-                    logger.info("Filled case number field")
-                    break
-                except NoSuchElementException:
-                    continue
-            
-            # Fill filing year
-            for selector in field_selectors['filing_year']:
-                try:
-                    element = self.driver.find_element(By.XPATH, selector)
-                    if element.tag_name == 'select':
-                        from selenium.webdriver.support.ui import Select
-                        select = Select(element)
-                        select.select_by_value(filing_year)
-                    else:
-                        element.clear()
-                        element.send_keys(filing_year)
-                    logger.info("Filled filing year field")
-                    break
-                except NoSuchElementException:
-                    continue
-            
+            case_number_input = self.driver.find_element(By.ID, "case_number")
+            case_number_input.clear()
+            case_number_input.send_keys(case_number)
+            logger.info(f"Filled case number: {case_number}")
             self.random_delay(1, 2)
+
+            print('** Selected filing year ** ' , filing_year)
+            
+            # Fill filing year dropdown
+            case_year_select = self.driver.find_element(By.ID, "case_year")
+            select_case_year = Select(case_year_select)
+            select_case_year.select_by_value(filing_year)
+            logger.info(f"Selected filing year: {filing_year}")
+            self.random_delay(1, 2)
+
+            print('** Filled case number ** ' , case_number)
+
+            # Get and fill captcha
+            captcha_code = self.get_captcha_code()
+            if captcha_code:
+                captcha_input = self.driver.find_element(By.ID, "captchaInput")
+                captcha_input.clear()
+                captcha_input.send_keys(captcha_code)
+                logger.info(f"Filled captcha code: {captcha_code}")
+                self.random_delay(1, 2)
+            else:
+                logger.warning("Could not get captcha code")
             
         except Exception as e:
             logger.error(f"Error filling search form: {e}")
@@ -192,28 +154,12 @@ class DelhiHighCourtScraper:
     def submit_search_form(self):
         """Submit the search form"""
         try:
-            # Common submit button selectors
-            submit_selectors = [
-                "//input[@type='submit']",
-                "//button[@type='submit']",
-                "//input[@value='Search']",
-                "//button[contains(text(), 'Search')]",
-                "//input[@value='Submit']",
-                "//button[contains(text(), 'Submit')]"
-            ]
-            
-            for selector in submit_selectors:
-                try:
-                    submit_btn = self.driver.find_element(By.XPATH, selector)
-                    submit_btn.click()
-                    logger.info("Submitted search form")
-                    self.random_delay(3, 6)  # Longer delay for search results
-                    return True
-                except NoSuchElementException:
-                    continue
-            
-            logger.warning("Could not find submit button")
-            return False
+            # Find and click the submit button
+            submit_btn = self.driver.find_element(By.ID, "search")
+            submit_btn.click()
+            logger.info("Clicked submit button")
+            self.random_delay(3, 6)  # Longer delay for search results
+            return True
             
         except Exception as e:
             logger.error(f"Error submitting search form: {e}")
@@ -224,22 +170,37 @@ class DelhiHighCourtScraper:
         try:
             logger.info("Extracting case data from search results...")
             
-            # Get page source for analysis
-            page_source = self.driver.page_source
-            
-            # Check if case was found
-            if "no case found" in page_source.lower() or "case not found" in page_source.lower():
-                logger.warning("Case not found in search results")
+            # Wait for results table to load
+            try:
+                self.wait.until(EC.presence_of_element_located((By.ID, "caseTable")))
+                logger.info("Results table found")
+            except TimeoutException:
+                logger.warning("No results table found, case might not exist")
                 return None
             
-            # Extract case information using various selectors
-            case_data = {
-                "parties": self.extract_parties(),
-                "dates": self.extract_dates(),
-                "orders": self.extract_orders(),
-                "case_status": self.extract_case_status()
-            }
+            # Check if case was found by looking for table rows
+            table = self.driver.find_element(By.ID, "caseTable")
+            tbody = table.find_element(By.TAG_NAME, "tbody")
+            rows = tbody.find_elements(By.TAG_NAME, "tr")
             
+            if not rows:
+                logger.warning("No case data found in table")
+                return None
+
+            # for i in range(len(rows)):
+            #     print('row' , rows[i].text)
+
+            # print('rows' , rows)
+            
+            # Extract case information from the table
+            case_data = {
+                "parties": self.extract_parties_from_table(rows),
+                "dates": self.extract_dates_from_table(rows),
+                "order_page_link": self.extract_orders_from_table(rows),
+                "case_status": self.extract_case_status_from_table(rows)
+            }
+
+
             logger.info("Successfully extracted case data")
             return case_data
             
@@ -247,140 +208,195 @@ class DelhiHighCourtScraper:
             logger.error(f"Error extracting case data: {e}")
             return None
     
-    def extract_parties(self):
-        """Extract petitioner and respondent information"""
+
+
+    def extract_parties_from_table(self, rows):
+        """Extract petitioner and respondent information from table rows"""
         try:
             parties = {"petitioner": "N/A", "respondent": "N/A"}
             
-            # Common selectors for party information
-            party_selectors = {
-                'petitioner': [
-                    "//td[contains(text(), 'Petitioner')]/following-sibling::td",
-                    "//div[contains(text(), 'Petitioner')]/following-sibling::div",
-                    "//span[contains(text(), 'Petitioner')]/following-sibling::span"
-                ],
-                'respondent': [
-                    "//td[contains(text(), 'Respondent')]/following-sibling::td",
-                    "//div[contains(text(), 'Respondent')]/following-sibling::div",
-                    "//span[contains(text(), 'Respondent')]/following-sibling::span"
-                ]
-            }
-            
-            for party_type, selectors in party_selectors.items():
-                for selector in selectors:
-                    try:
-                        element = self.driver.find_element(By.XPATH, selector)
-                        parties[party_type] = element.text.strip()
-                        break
-                    except NoSuchElementException:
-                        continue
+            if rows:
+                # Get the first row (most recent case)
+                first_row = rows[0]
+                cells = first_row.find_elements(By.TAG_NAME, "td")
+                
+                if len(cells) >= 3:  # Should have at least 3 columns
+                    # The third column contains "Petitioner VS. Respondent"
+                    party_cell = cells[2]
+                    party_text = party_cell.text.strip()
+                    
+                    # Handle the format: "AATMNIRBHAR INFRATECH PVT. LTD. AND ANR.\nVS.\nYASH PAL BATRA AND ORS."
+                    if "VS." in party_text:
+                        parts = party_text.split("VS.")
+                        if len(parts) >= 2:
+                            petitioner = parts[0].strip()
+                            respondent = parts[1].strip()
+                            # Clean up any extra whitespace and newlines
+                            parties["petitioner"] = petitioner.replace('\n', ' ').strip()
+                            parties["respondent"] = respondent.replace('\n', ' ').strip()
+                    else:
+                        parties["petitioner"] = party_text.replace('\n', ' ').strip()
             
             return parties
             
         except Exception as e:
-            logger.error(f"Error extracting parties: {e}")
+            logger.error(f"Error extracting parties from table: {e}")
             return {"petitioner": "N/A", "respondent": "N/A"}
     
-    def extract_dates(self):
-        """Extract filing and hearing dates"""
+
+
+    def extract_dates_from_table(self, rows):
+        """Extract filing and hearing dates from table rows"""
         try:
             dates = {"filing_date": "N/A", "next_hearing": "N/A"}
             
-            # Common selectors for date information
-            date_selectors = {
-                'filing_date': [
-                    "//td[contains(text(), 'Filing Date')]/following-sibling::td",
-                    "//div[contains(text(), 'Filing Date')]/following-sibling::div"
-                ],
-                'next_hearing': [
-                    "//td[contains(text(), 'Next Hearing')]/following-sibling::td",
-                    "//div[contains(text(), 'Next Hearing')]/following-sibling::div",
-                    "//td[contains(text(), 'Hearing Date')]/following-sibling::td"
-                ]
-            }
+            if rows:
+                # Get the first row (most recent case)
+                first_row = rows[0]
+                cells = first_row.find_elements(By.TAG_NAME, "td")
+                
+                if len(cells) >= 4:  # Should have at least 4 columns
+                    # The fourth column contains "NEXT DATE: 11/08/2025\nLast Date: 13/05/2025\nCOURT NO:41"
+                    date_cell = cells[3]
+                    date_text = date_cell.text.strip()
+                    
+                    if date_text and date_text != "":
+                        # Parse the date information
+                        lines = date_text.split('\n')
+
+                        # print('lines' , lines)
+                        # print('date_text' , date_text)
+
+                        for line in lines:
+                            line = line.strip()
+                            if line.startswith("NEXT DATE:"):
+                                next_date = line.replace("NEXT DATE:", "").strip()
+                                dates["next_hearing"] = next_date
+                            elif line.startswith("Last Date:"):
+                                last_date = line.replace("Last Date:", "").strip()
+                                dates["filing_date"] = last_date
+                            elif line.startswith("COURT NO:"):
+                                court_no = line.replace("COURT NO:", "").strip()
+                                dates["court_no"] = court_no
+                    else:
+                        dates["next_hearing"] = "No hearing date available"
             
-            for date_type, selectors in date_selectors.items():
-                for selector in selectors:
-                    try:
-                        element = self.driver.find_element(By.XPATH, selector)
-                        dates[date_type] = element.text.strip()
-                        break
-                    except NoSuchElementException:
-                        continue
-            
+            # print('dates' , dates)
             return dates
             
         except Exception as e:
-            logger.error(f"Error extracting dates: {e}")
+            logger.error(f"Error extracting dates from table: {e}")
             return {"filing_date": "N/A", "next_hearing": "N/A"}
     
-    def extract_orders(self):
-        """Extract order and judgment information"""
+
+
+    def extract_orders_from_table(self, rows):
+        """Extract order link"""
         try:
-            orders = []
             
-            # Look for order links or information
-            order_selectors = [
-                "//a[contains(@href, '.pdf')]",
-                "//a[contains(text(), 'Order')]",
-                "//a[contains(text(), 'Judgment')]",
-                "//a[contains(@href, 'order')]",
-                "//a[contains(@href, 'judgment')]"
-            ]
-            
-            for selector in order_selectors:
-                try:
-                    elements = self.driver.find_elements(By.XPATH, selector)
-                    for element in elements:
-                        order = {
-                            "date": datetime.now().strftime("%Y-%m-%d"),
-                            "title": element.text.strip() or "Order/Judgment",
-                            "pdf_url": element.get_attribute('href') or "#"
-                        }
-                        orders.append(order)
-                except Exception:
-                    continue
-            
-            # If no orders found, create a mock order
-            if not orders:
-                orders = [{
-                    "date": datetime.now().strftime("%Y-%m-%d"),
-                    "title": "Latest Order",
-                    "pdf_url": "#"
-                }]
-            
-            return orders
+            if rows:
+                first_row = rows[0]
+                cells = first_row.find_elements(By.TAG_NAME, "td")
+
+              
+                if len(cells) >= 2:  # Should have at least 2 columns
+                    case_cell = cells[1]
+
+                    try:
+                      
+                        order_link = case_cell.find_element("xpath", "//*[@id='caseTable']/tbody/tr/td[2]/a[2]").get_attribute("href")
+
+                        # print('** order_link ** ' , order_link)
+
+                        return order_link
+
+                     
+                    except NoSuchElementException:
+                        pass
+                    
+          
+            return '#'
             
         except Exception as e:
-            logger.error(f"Error extracting orders: {e}")
-            return [{
-                "date": datetime.now().strftime("%Y-%m-%d"),
-                "title": "Latest Order",
-                "pdf_url": "#"
-            }]
-    
-    def extract_case_status(self):
-        """Extract case status"""
+            logger.error(f"Error extracting orders from table: {e}")
+            return '#'
+
+
+        
+    def get_latest_order_pdf_link(self, order_page_link):
+
+        if order_page_link == '#':
+            return '#'
+        
+        """Extract order link, navigate, and get target link"""
         try:
-            status_selectors = [
-                "//td[contains(text(), 'Status')]/following-sibling::td",
-                "//div[contains(text(), 'Status')]/following-sibling::div",
-                "//span[contains(text(), 'Status')]/following-sibling::span"
-            ]
+            print('** Getting latest order pdf link ** ')
+
+            self.driver.get(order_page_link)
+
+            self.random_delay(1, 2)
+
+            # Wait for page to load and form to be present
+            self.wait.until(EC.presence_of_element_located((By.ID, "caseTable")))
+
+            target_link = self.driver.find_element(
+                By.XPATH, "//*[@id='caseTable']/tbody/tr[1]/td[2]/a"
+            ).get_attribute("href")
+
+            # print('** target_link ** ' , target_link)
+            return target_link
+
             
-            for selector in status_selectors:
-                try:
-                    element = self.driver.find_element(By.XPATH, selector)
-                    status = element.text.strip()
-                    if status:
+
+        except Exception as e:
+            logger.error(f"Error extracting orders from table: {e}")
+            print('** Error extracting orders from table: {e} ** ')
+            return '#'
+
+
+
+
+
+
+    
+    def extract_case_status_from_table(self, rows):
+        """Extract case status from table rows"""
+        try:
+            if rows:
+                # Get the first row (most recent case)
+                first_row = rows[0]
+                cells = first_row.find_elements(By.TAG_NAME, "td")
+                
+                if len(cells) >= 2:  # Should have at least 2 columns
+                    # The second column contains case info with status in green font
+                    case_cell = cells[1]
+                    
+                    # Look for status in font tag with green color
+                    try:
+                        status_font = case_cell.find_element(By.TAG_NAME, "font")
+                        if status_font and status_font.get_attribute("color") == "green":
+                            status = status_font.text.strip()
+                            # Remove brackets if present
+                            if status.startswith("[") and status.endswith("]"):
+                                status = status[1:-1]
+                            return status
+                    except NoSuchElementException:
+                        pass
+                    
+                    # Fallback: extract from text content
+                    case_text = case_cell.text.strip()
+                    if "[" in case_text and "]" in case_text:
+                        status_start = case_text.find("[") + 1
+                        status_end = case_text.find("]")
+                        status = case_text[status_start:status_end]
                         return status
-                except NoSuchElementException:
-                    continue
+                    else:
+                        return "Active"
             
             return "Pending"
             
         except Exception as e:
-            logger.error(f"Error extracting case status: {e}")
+            logger.error(f"Error extracting case status from table: {e}")
             return "Pending"
     
     def scrape_case(self, case_type, case_number, filing_year):
@@ -393,11 +409,6 @@ class DelhiHighCourtScraper:
             
             # Navigate to website
             self.navigate_to_court_website()
-            
-            # Find and click case status link
-            if not self.find_case_status_link():
-                logger.warning("Could not find case status link, using mock data")
-                return self.create_mock_data(case_type, case_number, filing_year), "Mock data - link not found"
             
             # Fill search form
             self.fill_case_search_form(case_type, case_number, filing_year)
@@ -414,8 +425,12 @@ class DelhiHighCourtScraper:
                 # Add case metadata
                 case_data.update({
                     "case_type": case_type,
-                    "case_number": case_number
+                    "case_number": case_number,
+                    "pdf_link": self.get_latest_order_pdf_link(case_data['order_page_link'])
                 })
+
+                print('** case_data ** ' , case_data)
+                
                 return case_data, self.driver.page_source
             else:
                 logger.warning("No case data extracted, using mock data")
@@ -452,7 +467,7 @@ class DelhiHighCourtScraper:
         }
 
 # Convenience function for external use
-def scrape_delhi_high_court(case_type, case_number, filing_year, headless=True):
+def scrape_delhi_high_court(case_type, case_number, filing_year, headless=False):
     """
     Convenience function to scrape Delhi High Court case information
     

@@ -36,7 +36,7 @@ def log_query(case_type, case_number, filing_year, raw_response, parsed_data):
     conn.commit()
     conn.close()
 
-# The scraping functionality is now handled by the scraper.py module
+
 
 @app.route('/')
 def index():
@@ -53,8 +53,8 @@ def fetch_case():
         if not all([case_type, case_number, filing_year]):
             return jsonify({'error': 'All fields are required'}), 400
         
-        # Scrape the court website
-        parsed_data, raw_response = scrape_delhi_high_court(case_type, case_number, filing_year)
+        # Scrape the court website (set headless=False to see the browser)
+        parsed_data, raw_response = scrape_delhi_high_court(case_type, case_number, filing_year, headless=False)
         
         if parsed_data is None:
             return jsonify({'error': f'Failed to fetch case data: {raw_response}'}), 500
@@ -72,22 +72,37 @@ def fetch_case():
 
 @app.route('/api/download-pdf', methods=['POST'])
 def download_pdf():
+
+    data = request.get_json()
+    pdf_url = data.get('pdfUrl')
+    filename = data.get('filename')
+
+    
     try:
-        data = request.get_json()
-        pdf_url = data.get('pdfUrl')
-        
-        if not pdf_url:
-            return jsonify({'error': 'PDF URL is required'}), 400
-        
-        # In a real implementation, you would download the PDF from the court website
-        # For now, we'll return a mock response
+        # Send a GET request to the URL
+        response = requests.get(pdf_url, stream=True)
+        response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+
+        download_directory = ".\downloads"  # Replace with your desired path
+        save_path = os.path.join(download_directory, filename) 
+
+        # Open the local file in binary write mode
+        with open(save_path, 'wb') as pdf_file:
+            # Iterate over the response content in chunks to handle large files
+            for chunk in response.iter_content(chunk_size=8192):
+                pdf_file.write(chunk)
+
+
+        print(f"PDF downloaded successfully to: {save_path}")
+
         return jsonify({
             'success': True,
-            'message': f'PDF download initiated for: {pdf_url}',
-            'downloadUrl': pdf_url
+            'message': f'PDF downloaded successfully to: Project/downloads/{filename}'
         })
+
         
     except Exception as e:
+        print('error' , e)
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
 
 @app.route('/api/query-history')
