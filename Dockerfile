@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 # Install system dependencies including Chrome
 RUN apt-get update && apt-get install -y \
+    google-chrome-stable \
     wget \
     gnupg \
     unzip \

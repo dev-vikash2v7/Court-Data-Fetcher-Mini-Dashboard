@@ -61,9 +61,9 @@ class DelhiHighCourtScraper:
             chrome_options.add_argument('--disable-features=VizDisplayCompositor')
             
             # Use webdriver-manager to automatically download and manage Chrome driver
-            service = Service(ChromeDriverManager().install())
+            # service = Service(ChromeDriverManager().install())
             
-            self.driver = webdriver.Chrome(service=service, options=chrome_options)
+            self.driver = webdriver.Chrome(options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
             self.wait = WebDriverWait(self.driver, 15)  # Increased timeout for production
             
