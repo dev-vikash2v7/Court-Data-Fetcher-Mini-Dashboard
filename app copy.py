@@ -8,6 +8,12 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# Production configuration
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+else:
+    # For production deployment
+    app.config['DEBUG'] = False
 
 # Database setup
 def init_db():
@@ -27,10 +33,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Initialize database on startup
-init_db()
-
-
 def log_query(case_type, case_number, filing_year, raw_response, parsed_data):
     conn = sqlite3.connect('court_data.db')
     cursor = conn.cursor()
@@ -41,18 +43,14 @@ def log_query(case_type, case_number, filing_year, raw_response, parsed_data):
     conn.commit()
     conn.close()
 
+# Initialize database on startup
+init_db()
+
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/health')
-def health_check():
-    """Health check endpoint for deployment platforms"""
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat(),
-        'service': 'court-scraper'
-    })
+
 
 @app.route('/api/fetch-case', methods=['POST'])
 def fetch_case():
@@ -96,7 +94,7 @@ def download_pdf():
         response = requests.get(pdf_url, stream=True)
         response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
 
-        download_directory = "/downloads"  # Replace with your desired path
+        download_directory = ".\downloads"  # Replace with your desired path
         save_path = os.path.join(download_directory, filename) 
 
         # Open the local file in binary write mode
@@ -113,7 +111,6 @@ def download_pdf():
             'message': f'PDF downloaded successfully to: Project/downloads/{filename}'
         })
 
-        
     except Exception as e:
         print('error' , e)
         return jsonify({'error': f'Download failed: {str(e)}'}), 500
@@ -147,11 +144,3 @@ def query_history():
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch history: {str(e)}'}), 500
-
-# Production configuration
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 5000)))
-    # app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
-else:
-    # For production deployment
-    app.config['DEBUG'] = False

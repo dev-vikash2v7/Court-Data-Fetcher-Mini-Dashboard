@@ -11,6 +11,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import time
 import random
 import logging
+import os
 from datetime import datetime
 import re
 
@@ -20,55 +21,59 @@ logger = logging.getLogger(__name__)
 
 class DelhiHighCourtScraper:
     """
-    Scraper class for Delhi High Court website
+    Scraper class for Delhi High Court website - Production Ready
     """
     
-    def __init__(self, headless=False):
+    def __init__(self, headless=True):
         self.headless = headless
         self.driver = None
         self.wait = None
         
     def setup_driver(self):
-        """Setup Chrome WebDriver with anti-detection measures"""
+        """Setup Chrome WebDriver with production-ready anti-detection measures"""
         try:
             chrome_options = Options()
             
-            if self.headless:
-                chrome_options.add_argument('--headless')
-            else:
-                # Make browser window visible and positioned
-                chrome_options.add_argument('--start-maximized')
-                chrome_options.add_argument('--disable-infobars')
-                chrome_options.add_argument('--disable-extensions')
-            
+            # Always run headless in production
+            chrome_options.add_argument('--headless')
             chrome_options.add_argument('--no-sandbox')
             chrome_options.add_argument('--disable-dev-shm-usage')
             chrome_options.add_argument('--disable-gpu')
+            chrome_options.add_argument('--disable-software-rasterizer')
+            chrome_options.add_argument('--disable-extensions')
+            chrome_options.add_argument('--disable-plugins')
+            chrome_options.add_argument('--disable-images')
+            chrome_options.add_argument('--disable-background-timer-throttling')
+            chrome_options.add_argument('--disable-backgrounding-occluded-windows')
+            chrome_options.add_argument('--disable-renderer-backgrounding')
+            chrome_options.add_argument('--disable-features=TranslateUI')
+            chrome_options.add_argument('--disable-ipc-flooding-protection')
             chrome_options.add_argument('--window-size=1920,1080')
-            chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36')
+            chrome_options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
             chrome_options.add_argument('--disable-blink-features=AutomationControlled')
             chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
             chrome_options.add_experimental_option('useAutomationExtension', False)
+            
+            # Production-specific options for Render/Heroku
+            chrome_options.add_argument('--remote-debugging-port=9222')
+            chrome_options.add_argument('--disable-web-security')
+            chrome_options.add_argument('--allow-running-insecure-content')
+            chrome_options.add_argument('--disable-features=VizDisplayCompositor')
             
             # Use webdriver-manager to automatically download and manage Chrome driver
             service = Service(ChromeDriverManager().install())
             
             self.driver = webdriver.Chrome(service=service, options=chrome_options)
             self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-            self.wait = WebDriverWait(self.driver, 10)
+            self.wait = WebDriverWait(self.driver, 15)  # Increased timeout for production
             
-            # Add a delay so you can see the browser window
-            if not self.headless:
-                time.sleep(3)
-                logger.info("Browser window opened - you can now see the scraping process")
-            
-            logger.info("Chrome WebDriver setup successful")
+            logger.info("Chrome WebDriver setup successful (headless mode)")
         except Exception as e:
             logger.error(f"Failed to setup Chrome WebDriver: {e}")
             raise
     
-    def random_delay(self, min_seconds=2, max_seconds=5):
-        """Add random delay to avoid detection and allow viewing"""
+    def random_delay(self, min_seconds=1, max_seconds=3):
+        """Add random delay to avoid detection (reduced for production)"""
         delay = random.uniform(min_seconds, max_seconds)
         time.sleep(delay)
     
@@ -78,7 +83,7 @@ class DelhiHighCourtScraper:
             logger.info("Navigating to Delhi High Court website...")
             # Navigate directly to the case status page
             self.driver.get("https://delhihighcourt.nic.in/app/get-case-type-status")
-            self.random_delay(3, 5)
+            self.random_delay(2, 4)
             
             # Wait for page to load and form to be present
             self.wait.until(EC.presence_of_element_located((By.ID, "case_type")))
@@ -95,7 +100,6 @@ class DelhiHighCourtScraper:
             captcha_element = self.wait.until(EC.presence_of_element_located((By.ID, "captcha-code")))
             captcha_code = captcha_element.text.strip()
 
-            print('** Get Captcha Code ** ' , captcha_code)
             logger.info(f"Captcha code found: {captcha_code}")
             return captcha_code
         except Exception as e:
@@ -114,9 +118,6 @@ class DelhiHighCourtScraper:
             select_case_type.select_by_value(case_type)
             logger.info(f"Selected case type: {case_type}")
             self.random_delay(1, 2)
-
-            print('** Filled case type ** ' , case_type)
-
             
             # Fill case number
             case_number_input = self.driver.find_element(By.ID, "case_number")
@@ -124,8 +125,6 @@ class DelhiHighCourtScraper:
             case_number_input.send_keys(case_number)
             logger.info(f"Filled case number: {case_number}")
             self.random_delay(1, 2)
-
-            print('** Selected filing year ** ' , filing_year)
             
             # Fill filing year dropdown
             case_year_select = self.driver.find_element(By.ID, "case_year")
@@ -133,8 +132,6 @@ class DelhiHighCourtScraper:
             select_case_year.select_by_value(filing_year)
             logger.info(f"Selected filing year: {filing_year}")
             self.random_delay(1, 2)
-
-            print('** Filled case number ** ' , case_number)
 
             # Get and fill captcha
             captcha_code = self.get_captcha_code()
@@ -158,7 +155,7 @@ class DelhiHighCourtScraper:
             submit_btn = self.driver.find_element(By.ID, "search")
             submit_btn.click()
             logger.info("Clicked submit button")
-            self.random_delay(3, 6)  # Longer delay for search results
+            self.random_delay(3, 5)  # Reduced delay for production
             return True
             
         except Exception as e:
@@ -186,11 +183,6 @@ class DelhiHighCourtScraper:
             if not rows:
                 logger.warning("No case data found in table")
                 return None
-
-            # for i in range(len(rows)):
-            #     print('row' , rows[i].text)
-
-            # print('rows' , rows)
             
             # Extract case information from the table
             case_data = {
@@ -200,7 +192,6 @@ class DelhiHighCourtScraper:
                 "case_status": self.extract_case_status_from_table(rows)
             }
 
-
             logger.info("Successfully extracted case data")
             return case_data
             
@@ -208,7 +199,6 @@ class DelhiHighCourtScraper:
             logger.error(f"Error extracting case data: {e}")
             return None
     
-
 
     def extract_parties_from_table(self, rows):
         """Extract petitioner and respondent information from table rows"""
@@ -244,7 +234,6 @@ class DelhiHighCourtScraper:
             return {"petitioner": "N/A", "respondent": "N/A"}
     
 
-
     def extract_dates_from_table(self, rows):
         """Extract filing and hearing dates from table rows"""
         try:
@@ -264,9 +253,6 @@ class DelhiHighCourtScraper:
                         # Parse the date information
                         lines = date_text.split('\n')
 
-                        # print('lines' , lines)
-                        # print('date_text' , date_text)
-
                         for line in lines:
                             line = line.strip()
                             if line.startswith("NEXT DATE:"):
@@ -281,14 +267,12 @@ class DelhiHighCourtScraper:
                     else:
                         dates["next_hearing"] = "No hearing date available"
             
-            # print('dates' , dates)
             return dates
             
         except Exception as e:
             logger.error(f"Error extracting dates from table: {e}")
             return {"filing_date": "N/A", "next_hearing": "N/A"}
     
-
 
     def extract_orders_from_table(self, rows):
         """Extract order link"""
@@ -305,8 +289,6 @@ class DelhiHighCourtScraper:
                     try:
                       
                         order_link = case_cell.find_element("xpath", "//*[@id='caseTable']/tbody/tr/td[2]/a[2]").get_attribute("href")
-
-                        # print('** order_link ** ' , order_link)
 
                         return order_link
 
@@ -330,7 +312,7 @@ class DelhiHighCourtScraper:
         
         """Extract order link, navigate, and get target link"""
         try:
-            print('** Getting latest order pdf link ** ')
+            logger.info("Getting latest order pdf link")
 
             self.driver.get(order_page_link)
 
@@ -343,14 +325,12 @@ class DelhiHighCourtScraper:
                 By.XPATH, "//*[@id='caseTable']/tbody/tr[1]/td[2]/a"
             ).get_attribute("href")
 
-            # print('** target_link ** ' , target_link)
             return target_link
 
             
 
         except Exception as e:
             logger.error(f"Error extracting orders from table: {e}")
-            print('** Error extracting orders from table: {e} ** ')
             return '#'
 
 
@@ -429,7 +409,7 @@ class DelhiHighCourtScraper:
                     "pdf_link": self.get_latest_order_pdf_link(case_data['order_page_link'])
                 })
 
-                print('** case_data ** ' , case_data)
+                logger.info("Case data extracted successfully")
                 
                 return case_data, self.driver.page_source
             else:
@@ -467,7 +447,7 @@ class DelhiHighCourtScraper:
         }
 
 # Convenience function for external use
-def scrape_delhi_high_court(case_type, case_number, filing_year, headless=False):
+def scrape_delhi_high_court(case_type, case_number, filing_year, headless=True):
     """
     Convenience function to scrape Delhi High Court case information
     
@@ -475,7 +455,7 @@ def scrape_delhi_high_court(case_type, case_number, filing_year, headless=False)
         case_type (str): Type of case (WP, CRL, etc.)
         case_number (str): Case number
         filing_year (str): Filing year
-        headless (bool): Run browser in headless mode
+        headless (bool): Run browser in headless mode (default: True for production)
     
     Returns:
         tuple: (parsed_data, raw_response)

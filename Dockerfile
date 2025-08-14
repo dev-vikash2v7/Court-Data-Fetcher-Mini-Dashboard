@@ -41,5 +41,8 @@ EXPOSE 5000
 # Make startup script executable
 RUN chmod +x start.sh
 
+# Test Chrome setup
+RUN python test_chrome.py
+
 # Set the default command
 CMD ["./start.sh"]
