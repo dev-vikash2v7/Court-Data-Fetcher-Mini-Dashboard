@@ -1,102 +1,155 @@
-# Court Data Fetcher - Delhi High Court
+# Delhi High Court Case Scraper
 
-A Flask-based web application for fetching and displaying case information from the Delhi High Court website using Selenium web scraping.
+A web application for scraping and retrieving case information from the Delhi High Court website.
 
 ## Features
 
-- **Case Search**: Search for cases by Case Type, Case Number, and Filing Year
-- **Web Scraping**: Automated data extraction from Delhi High Court website using Selenium
-- **Data Storage**: SQLite database for logging queries and responses
-- **Modern UI**: Clean, responsive interface with real-time updates
-- **PDF Downloads**: Download court orders and judgments
-- **Search History**: Track and reuse previous searches
-- **Error Handling**: User-friendly error messages and validation
+- Search cases by case type, case number, and filing year
+- Extract case details including parties, dates, and status
+- Download case orders and documents
+- Production-ready with headless Chrome support
+- Deployable on Render, Heroku, and other cloud platforms
 
-## Technology Stack
+## Production Deployment
 
-- **Backend**: Python Flask
-- **Web Scraping**: Selenium WebDriver
-- **Database**: SQLite
-- **Frontend**: HTML5, CSS3, JavaScript 
-- **Styling**: Custom CSS with modern design principles
+### Deploy on Render (Recommended)
 
-## Prerequisites
+1. **Fork/Clone this repository**
+2. **Connect to Render:**
+   - Go to [Render Dashboard](https://dashboard.render.com)
+   - Click "New +" and select "Web Service"
+   - Connect your GitHub repository
+   - Render will automatically detect the `render.yaml` configuration
 
-- Python 3.8 or higher
-- Latest Chrome browser (for Selenium WebDriver)
-- ChromeDriver (will be automatically managed by Selenium)
+3. **Automatic Deployment:**
+   - The service will be automatically deployed using the configuration in `render.yaml`
+   - Chrome and all dependencies will be installed automatically
+   - The application will run in headless mode for production
 
-## Installation
+### Manual Render Deployment
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd court-data-fetcher
-   ```
+If you prefer manual setup:
 
-2. **Create a virtual environment**
-   ```bash
-   python -m venv venv
-   
-   # On Windows
-   venv\Scripts\activate
-   
-   # On macOS/Linux
-   source venv/bin/activate
-   ```
+1. Create a new Web Service on Render
+2. Set the following:
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `gunicorn --config gunicorn.conf.py app:app`
+   - **Environment Variables:**
+     - `PORT`: `5000`
+     - `PYTHON_VERSION`: `3.9.0`
 
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Docker Deployment
 
-4. **Run the application**
-   ```bash
-   python app.py
-   ```
+```bash
+# Build the Docker image
+docker build -t court-scraper .
 
-5. **Access the application**
-   Open your browser and navigate to `http://localhost:5000`
-
-## Project Structure
-
+# Run the container
+docker run -p 5000:5000 court-scraper
 ```
-court-data-fetcher/
-├── app.py                 # Main Flask application
-├── requirements.txt       # Python dependencies
-├── README.md             # Project documentation
-├── court_data.db         # SQLite database (created automatically)
-├── templates/
-│   └── index.html        # Main HTML template
-└── static/
-    ├── css/
-    │   └── style.css     # Custom stylesheets
-    └── js/
-        └── app.js        # Frontend JavaScript
+
+### Local Development
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Run the application
+python app.py
 ```
 
 ## API Endpoints
 
 ### POST /api/fetch-case
-Fetches case information from Delhi High Court website.
+Search for a case by providing case details.
 
-
-
-## Database Schema
-
-The SQLite database (`court_data.db`) contains a single table:
-
-```sql
-CREATE TABLE queries (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    case_type TEXT,
-    case_number TEXT,
-    filing_year TEXT,
-    query_timestamp DATETIME,
-    raw_response TEXT,
-    parsed_data TEXT
-);
+**Request Body:**
+```json
+{
+  "caseType": "WP",
+  "caseNumber": "1234",
+  "filingYear": "2024"
+}
 ```
-## Build and start the Docker services
 
-```docker-compose up --build```
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "case_type": "WP",
+    "case_number": "1234",
+    "parties": {
+      "petitioner": "Petitioner Name",
+      "respondent": "Respondent Name"
+    },
+    "dates": {
+      "filing_date": "2024-01-15",
+      "next_hearing": "2024-12-20"
+    },
+    "case_status": "Pending",
+    "pdf_link": "https://..."
+  }
+}
+```
+
+### POST /api/download-pdf
+Download a PDF file from a URL.
+
+**Request Body:**
+```json
+{
+  "pdfUrl": "https://example.com/document.pdf",
+  "filename": "document.pdf"
+}
+```
+
+## Technical Details
+
+### Production Features
+
+- **Headless Chrome:** Runs without GUI for server deployment
+- **Gunicorn:** Production WSGI server
+- **Anti-detection:** Chrome options to avoid bot detection
+- **Error Handling:** Comprehensive error handling and logging
+- **Database:** SQLite for query logging
+- **Caching:** Optimized for performance
+
+### Chrome Configuration
+
+The scraper uses the following Chrome options for production:
+
+```python
+chrome_options.add_argument('--headless')
+chrome_options.add_argument('--no-sandbox')
+chrome_options.add_argument('--disable-dev-shm-usage')
+chrome_options.add_argument('--disable-gpu')
+chrome_options.add_argument('--disable-extensions')
+chrome_options.add_argument('--disable-images')
+chrome_options.add_argument('--disable-javascript')
+```
+
+### Environment Variables
+
+- `PORT`: Application port (default: 5000)
+- `PYTHON_VERSION`: Python version (default: 3.9.0)
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Chrome not found:** Ensure Chrome is installed in the Docker container
+2. **Timeout errors:** Increase timeout values in the scraper
+3. **Memory issues:** Reduce worker count in gunicorn.conf.py
+4. **Captcha issues:** The scraper handles captcha automatically
+
+### Logs
+
+Check application logs for debugging:
+- Render: View logs in the Render dashboard
+- Docker: `docker logs <container_id>`
+- Local: Check console output
+
+## License
+
+This project is for educational purposes only. Please respect the Delhi High Court website's terms of service.

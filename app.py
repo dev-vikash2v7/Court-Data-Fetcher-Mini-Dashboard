@@ -8,6 +8,13 @@ from datetime import datetime
 
 app = Flask(__name__)
 
+# Production configuration
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5000)), debug=False)
+else:
+    # For production deployment
+    app.config['DEBUG'] = False
+
 # Database setup
 def init_db():
     conn = sqlite3.connect('court_data.db')
@@ -36,11 +43,21 @@ def log_query(case_type, case_number, filing_year, raw_response, parsed_data):
     conn.commit()
     conn.close()
 
-
+# Initialize database on startup
+init_db()
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/health')
+def health_check():
+    """Health check endpoint for deployment platforms"""
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat(),
+        'service': 'court-scraper'
+    })
 
 @app.route('/api/fetch-case', methods=['POST'])
 def fetch_case():
@@ -54,8 +71,8 @@ def fetch_case():
         if not all([case_type, case_number, filing_year]):
             return jsonify({'error': 'All fields are required'}), 400
         
-        # Scrape the court website (set headless=False to see the browser)
-        parsed_data, raw_response = scrape_delhi_high_court(case_type, case_number, filing_year, headless=False)
+        # Scrape the court website (headless mode for production)
+        parsed_data, raw_response = scrape_delhi_high_court(case_type, case_number, filing_year, headless=True)
         
         if parsed_data is None:
             return jsonify({'error': f'Failed to fetch case data: {raw_response}'}), 500
@@ -135,7 +152,3 @@ def query_history():
         
     except Exception as e:
         return jsonify({'error': f'Failed to fetch history: {str(e)}'}), 500
-
-if __name__ == '__main__':
-    init_db()
-    app.run(debug=True, host='0.0.0.0', port=5000)
