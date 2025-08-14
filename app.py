@@ -45,6 +45,7 @@ def index():
 @app.route('/api/fetch-case', methods=['POST'])
 def fetch_case():
     try:
+        print("fetching case")
         data = request.get_json()
         case_type = data.get('caseType')
         case_number = data.get('caseNumber')
